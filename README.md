@@ -1,7 +1,7 @@
 # Basic LLM Agent
 
-A small Java project containing two introductory examples of calling an OpenAI
-model with the OpenAI Java SDK. Both programs are interactive console
+A small Java project containing three examples of calling an OpenAI model with
+the OpenAI Java SDK. All programs are interactive console
 applications and have their own `main` method.
 
 ## Examples
@@ -48,6 +48,146 @@ Example:
 Enter a basic math expression or question: (12 + 8) * 3
 AI result: 60
 ```
+
+## Payment Investigation Agent
+
+Main class: `org.sud.mod3.App`
+
+### What does this demonstrate?
+
+This example demonstrates a genuine LLM-controlled agent loop. Unlike a
+traditional workflow, the application does not determine the investigation
+sequence in advance. Java exposes payment, account, customer, and ledger
+capabilities as tools. The LLM examines the user's goal, selects a tool,
+evaluates its result, and then decides whether another tool is required. This
+continues until the model has enough evidence to answer the original question.
+
+> **Java defines what the agent CAN do. The LLM decides what the agent SHOULD do
+> next.**
+
+The Java code contains no `if payment failed, then get account` investigation
+logic. Different questions and tool observations can therefore produce
+different paths through the same four capabilities.
+
+### Traditional workflow vs agent
+
+In a traditional workflow, the developer fixes the sequence in application
+code:
+
+```text
+getPayment()
+     |
+     v
+if failed
+     |
+     v
+getAccount()
+     |
+     v
+getLedger()
+```
+
+In the agent approach, the model controls the sequence:
+
+```text
+               +----------------+
+               |      LLM       |
+               +-------+--------+
+                       |
+                 chooses tool
+                       |
+                       v
+               +----------------+
+               |   Java Tools   |
+               +-------+--------+
+                       |
+                  observation
+                       |
+                       +----------> LLM
+                                      |
+                               enough information?
+                                /             \
+                              no               yes
+                              |                 |
+                        another tool       final answer
+```
+
+The developer defines the available capabilities. The LLM determines which
+capabilities are needed and in what order.
+
+### Available tools
+
+- `getPayment` retrieves payment status, related IDs, amount, currency, and any
+  failure code.
+- `getAccount` retrieves an account's type, owner, status, and closed date.
+- `getCustomer` retrieves a customer's lifecycle status and risk level.
+- `getLedgerEntries` retrieves debit, credit, and reversal activity and its
+  posting status for a payment.
+
+The tool descriptions explain the information each capability provides. They
+do not prescribe an investigation workflow.
+
+### Example agent flow
+
+For this request:
+
+```text
+Investigate PAY-1004 and tell me why it failed.
+```
+
+The model can discover the following path:
+
+```text
+User
+ |
+ v
+LLM
+ |
+ +--> getPayment("PAY-1004")
+ |         |
+ |         +--> FAILED / ACCOUNT_VALIDATION_FAILED / ACC-500
+ |
+ +--> getAccount("ACC-500")
+           |
+           +--> CLOSED / 2026-07-31
+
+LLM
+ |
+ v
+Final explanation: the funding account was closed before the payment.
+```
+
+That path is an example, not Java application logic. The model chooses the
+actual tools at runtime. Console logging displays every iteration, selected
+tool, arguments, observation, and final response so the loop is easy to follow.
+
+### Run the payment investigation agent
+
+Set `OPENAI_API_KEY` as described below, compile the project, and run:
+
+```bash
+mvn clean compile
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=org.sud.mod3.App
+```
+
+Example input:
+
+```text
+Investigate PAY-1004 and tell me why it failed.
+```
+
+The exact model wording and selected calls can vary, but the output will show
+the agent iterations and any tools chosen by the model before its conclusion.
+The loop stops with a clear error if it exceeds ten model iterations.
+
+### Sample investigation scenarios
+
+- `PAY-1004` — failed payment with a closed funding account
+- `PAY-2001` — successful payment whose merchant credit is still pending
+- `PAY-3005` — successful payment with posted debit and credit entries
+- `PAY-4002` — failed validation for a suspended customer
+- `PAY-9999` — nonexistent payment; the agent should not invent data
 
 ## Prerequisites
 
@@ -129,6 +269,13 @@ mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
   -Dexec.mainClass=org.sud.mod2.App
 ```
 
+Run the payment investigation agent:
+
+```bash
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=org.sud.mod3.App
+```
+
 On Windows PowerShell, enter each command on one line or replace the `\` line
 continuation with a PowerShell backtick.
 
@@ -152,6 +299,12 @@ high-stakes calculations.
 
 ```text
 src/main/java/org/sud/
-├── mod1/App.java   # Addition agent
-└── mod2/App.java   # General basic-math agent
+├── mod1/App.java            # Addition agent
+├── mod2/App.java            # General basic-math agent
+└── mod3/
+    ├── App.java             # Payment investigation console runner
+    ├── agent/               # LLM-to-tool interaction loop
+    ├── model/               # Payment domain records
+    ├── repository/          # Seeded in-memory data
+    └── tools/               # Tool definitions and dispatcher
 ```
