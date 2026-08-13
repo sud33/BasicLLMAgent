@@ -4,6 +4,8 @@ A small Java project containing three examples of calling an OpenAI model with
 the OpenAI Java SDK. All programs are interactive console
 applications and have their own `main` method.
 
+![AI Agent Loop in Java](docs/images/AI_AGENT_IN_LOOP.png)
+
 ## Examples
 
 ### 1. Addition agent
